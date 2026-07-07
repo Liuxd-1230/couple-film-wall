@@ -52,8 +52,11 @@ create table if not exists public.anniversaries (
 
 create index if not exists couple_members_user_id_idx on public.couple_members(user_id);
 create index if not exists photos_couple_taken_idx on public.photos(couple_id, taken_at desc);
+create index if not exists photos_user_id_idx on public.photos(user_id);
 create index if not exists messages_couple_created_idx on public.messages(couple_id, created_at desc);
+create index if not exists messages_user_id_idx on public.messages(user_id);
 create index if not exists anniversaries_couple_date_idx on public.anniversaries(couple_id, date);
+create index if not exists anniversaries_created_by_idx on public.anniversaries(created_by);
 
 create or replace function public.is_couple_member(target_couple_id uuid)
 returns boolean
@@ -184,6 +187,15 @@ grant select, insert, update, delete on public.photos to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
 grant select, insert, update, delete on public.anniversaries to authenticated;
 grant execute on function public.is_couple_member(uuid) to authenticated;
+
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public;
+    revoke execute on function public.rls_auto_enable() from anon;
+    revoke execute on function public.rls_auto_enable() from authenticated;
+  end if;
+end $$;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
