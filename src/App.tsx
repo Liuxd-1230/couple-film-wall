@@ -40,6 +40,8 @@ import { isSupabaseConfigured } from './lib/supabase'
 import type { Anniversary, Message, Photo, RouteId, TimelineItem, WorkspaceData } from './types'
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
+const otpMinLength = 6
+const otpMaxLength = 8
 
 const routes: Array<{ id: RouteId; label: string; icon: typeof Home }> = [
   { id: 'home', label: '首页', icon: Home },
@@ -370,7 +372,7 @@ function LoginScreen({
       await signInWithEmail(email)
       setOtpSentTo(email)
       setToken('')
-      onNotice({ type: 'success', text: '验证码已发送，请在邮箱里查看 6 位数字。' })
+      onNotice({ type: 'success', text: '验证码已发送，请在邮箱里查看数字验证码。' })
     } catch (error) {
       onNotice({ type: 'error', text: getErrorMessage(error) })
     } finally {
@@ -422,20 +424,20 @@ function LoginScreen({
             </form>
             {otpSentTo ? (
               <form className="login-form otp-form" onSubmit={verifyCode}>
-                <label htmlFor="otp">输入邮箱里的 6 位验证码</label>
+                <label htmlFor="otp">输入邮箱里的数字验证码</label>
                 <div className="field-row">
                   <input
                     autoComplete="one-time-code"
                     id="otp"
                     inputMode="numeric"
-                    maxLength={6}
-                    pattern="[0-9]{6}"
+                    maxLength={otpMaxLength}
+                    pattern="[0-9]{6,8}"
                     required
                     value={token}
-                    onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="123456"
+                    onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, otpMaxLength))}
+                    placeholder="12345678"
                   />
-                  <button disabled={isVerifying || token.length !== 6} type="submit">
+                  <button disabled={isVerifying || token.length < otpMinLength} type="submit">
                     {isVerifying ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
                     验证进入
                   </button>

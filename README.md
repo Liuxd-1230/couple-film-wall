@@ -17,7 +17,7 @@ npm run dev
 1. 创建 Supabase 项目。
 2. 在 Authentication 中开启 Email OTP，并把站点 URL 设置为 GitHub Pages 地址；本地开发时加入 `http://localhost:5173`。
 3. 如果是 2026-06-03 之后创建的 Supabase 免费项目，需要先在 Authentication -> SMTP Settings 启用自己的 SMTP（例如 QQ 邮箱 SMTP），否则默认邮件服务可能不会使用自定义模板。
-4. 在 Authentication -> Email Templates -> Magic Link or OTP 中加入 `{{ .Token }}`，让邮件显示 6 位验证码，并点击页面底部的 Save。示例正文：
+4. 在 Authentication -> Email Templates -> Magic Link or OTP 中加入 `{{ .Token }}`，让邮件显示数字验证码，并点击页面底部的 Save。示例正文：
    ```html
    <h2>你的登录验证码</h2>
    <p>请输入这个验证码：{{ .Token }}</p>
