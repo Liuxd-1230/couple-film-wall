@@ -415,20 +415,32 @@ p {
   break-inside: avoid;
   display: inline-block;
   margin: 0 0 18px;
-  padding: 11px 11px 18px;
+  padding: var(--polaroid-pad, 11px) var(--polaroid-pad, 11px) var(--polaroid-bottom, 22px);
   position: relative;
+  rotate: var(--polaroid-tilt, -1deg);
   transition: transform 180ms ease;
   width: 100%;
 }
 
+.polaroid-card.portrait {
+  margin-left: 4%;
+  width: 92%;
+}
+
+.polaroid-card.square {
+  margin-left: 2%;
+  width: 96%;
+}
+
 .polaroid-card:hover {
-  transform: translateY(-2px) rotate(0deg);
+  rotate: 0deg;
+  transform: translateY(-2px);
 }
 
 .photo-open-button,
 .image-missing {
-  aspect-ratio: 4 / 3;
-  background: var(--paper-deep);
+  aspect-ratio: var(--photo-ratio, 4 / 3);
+  background: var(--polaroid-tone, var(--paper-deep));
   border-radius: 3px;
   overflow: hidden;
   object-fit: cover;

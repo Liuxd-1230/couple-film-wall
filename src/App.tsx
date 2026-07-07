@@ -1,4 +1,4 @@
-import type { FormEvent, PointerEvent, ReactNode } from 'react'
+import type { CSSProperties, FormEvent, PointerEvent, ReactNode, SyntheticEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -45,6 +45,22 @@ import type { Anniversary, Message, Photo, RouteId, TimelineItem, WorkspaceData 
 type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
 const otpMinLength = 6
 const otpMaxLength = 8
+type PhotoShape = 'landscape' | 'portrait' | 'square'
+type PolaroidLayout = {
+  bottom: number
+  kind: PhotoShape
+  pad: number
+  ratio: number
+  tilt: number
+  tone: string
+}
+type PolaroidStyle = CSSProperties & {
+  '--photo-ratio': string
+  '--polaroid-bottom': string
+  '--polaroid-pad': string
+  '--polaroid-tone': string
+  '--polaroid-tilt': string
+}
 
 const routes: Array<{ id: RouteId; label: string; icon: typeof Home }> = [
   { id: 'home', label: '首页', icon: Home },
@@ -643,9 +659,25 @@ function PhotoWall({
   photos: Photo[]
 }) {
   const [activeTag, setActiveTag] = useState('全部')
+  const [photoLayouts, setPhotoLayouts] = useState<Record<string, PolaroidLayout>>({})
   const [viewerPhoto, setViewerPhoto] = useState<Photo | null>(null)
   const tags = useMemo(() => ['全部', ...Array.from(new Set(photos.flatMap((photo) => photo.tags)))], [photos])
   const filtered = activeTag === '全部' ? photos : photos.filter((photo) => photo.tags.includes(activeTag))
+
+  const updatePhotoLayout = (photo: Photo, index: number, event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget
+    const naturalRatio = image.naturalWidth / image.naturalHeight
+    const layout = buildPolaroidLayout(index, naturalRatio)
+
+    setPhotoLayouts((current) => {
+      const previous = current[photo.id]
+      if (previous && Math.abs(previous.ratio - layout.ratio) < 0.01 && previous.kind === layout.kind) {
+        return current
+      }
+
+      return { ...current, [photo.id]: layout }
+    })
+  }
 
   return (
     <main className="page-grid">
@@ -659,29 +691,40 @@ function PhotoWall({
           ))}
         </div>
         <div className="photo-masonry">
-          {filtered.map((photo, index) => (
-            <article className="polaroid-card" key={photo.id} style={{ rotate: `${index % 2 === 0 ? -1.3 : 1.1}deg` }}>
-              {photo.signedUrl ? (
-                <button className="photo-open-button" type="button" onClick={() => setViewerPhoto(photo)} aria-label={`查看照片：${photo.caption}`}>
-                  <img alt={photo.caption} src={photo.signedUrl} />
-                </button>
-              ) : (
-                <div className="image-missing">照片链接过期</div>
-              )}
-              <div className="polaroid-caption">
-                <p>{photo.caption}</p>
-                <time>{formatFullDate(photo.taken_at)}</time>
-                <div>
-                  {photo.tags.map((tag) => (
-                    <span key={tag}>#{tag}</span>
-                  ))}
+          {filtered.map((photo, index) => {
+            const layout = photoLayouts[photo.id] ?? buildFallbackPolaroidLayout(index)
+            const polaroidStyle: PolaroidStyle = {
+              '--photo-ratio': String(layout.ratio),
+              '--polaroid-bottom': `${layout.bottom}px`,
+              '--polaroid-pad': `${layout.pad}px`,
+              '--polaroid-tilt': `${layout.tilt}deg`,
+              '--polaroid-tone': layout.tone,
+            }
+
+            return (
+              <article className={`polaroid-card ${layout.kind}`} key={photo.id} style={polaroidStyle}>
+                {photo.signedUrl ? (
+                  <button className="photo-open-button" type="button" onClick={() => setViewerPhoto(photo)} aria-label={`查看照片：${photo.caption}`}>
+                    <img alt={photo.caption} src={photo.signedUrl} onLoad={(event) => updatePhotoLayout(photo, index, event)} />
+                  </button>
+                ) : (
+                  <div className="image-missing">照片链接过期</div>
+                )}
+                <div className="polaroid-caption">
+                  <p>{photo.caption}</p>
+                  <time>{formatFullDate(photo.taken_at)}</time>
+                  <div>
+                    {photo.tags.map((tag) => (
+                      <span key={tag}>#{tag}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <button className="icon-button danger" title="删除照片" type="button" onClick={() => void onDelete(photo)}>
-                <Trash2 size={17} />
-              </button>
-            </article>
-          ))}
+                <button className="icon-button danger" title="删除照片" type="button" onClick={() => void onDelete(photo)}>
+                  <Trash2 size={17} />
+                </button>
+              </article>
+            )
+          })}
         </div>
       </section>
       <PhotoUploadForm onUpload={onUpload} />
@@ -1202,6 +1245,29 @@ function clamp(value: number, min: number, max: number) {
 
 function distanceBetween(first: { x: number; y: number }, second: { x: number; y: number }) {
   return Math.hypot(first.x - second.x, first.y - second.y)
+}
+
+function buildFallbackPolaroidLayout(index: number): PolaroidLayout {
+  const ratios = [0.86, 1.28, 0.72, 1.05, 1.48, 0.95]
+  return buildPolaroidLayout(index, ratios[index % ratios.length])
+}
+
+function buildPolaroidLayout(index: number, naturalRatio: number): PolaroidLayout {
+  const tones = ['#ead7b8', '#dce4d4', '#f2d4c8', '#d9e3e6', '#f0dfbd']
+  const tilts = [-2.2, 1.4, -0.7, 2, -1.5, 0.8]
+  const pads = [10, 13, 11, 15, 12, 14]
+  const bottoms = [20, 28, 24, 18, 32, 22]
+  const ratio = clamp(naturalRatio, 0.64, 1.75)
+  const kind: PhotoShape = ratio < 0.86 ? 'portrait' : ratio > 1.28 ? 'landscape' : 'square'
+
+  return {
+    bottom: bottoms[index % bottoms.length],
+    kind,
+    pad: pads[index % pads.length],
+    ratio,
+    tilt: tilts[index % tilts.length],
+    tone: tones[index % tones.length],
+  }
 }
 
 export default App
