@@ -1,0 +1,66 @@
+:root {
+  --paper: #f5ead8;
+  --paper-deep: #ead6bb;
+  --surface: #fffaf0;
+  --surface-strong: #fff4df;
+  --ink: #2f231c;
+  --muted: #816f5e;
+  --line: #d7bfa0;
+  --rose: #b96f5d;
+  --rose-deep: #8f493f;
+  --sage: #66775a;
+  --amber: #c8954f;
+  --shadow: 0 18px 45px rgba(72, 45, 24, 0.14);
+  --soft-shadow: 0 8px 22px rgba(72, 45, 24, 0.1);
+  --radius: 8px;
+  --sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --serif: Georgia, "Times New Roman", "Songti SC", serif;
+
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 16% 8%, rgba(201, 149, 79, 0.16), transparent 26rem),
+    linear-gradient(135deg, rgba(255, 250, 240, 0.82), rgba(234, 214, 187, 0.64)),
+    var(--paper);
+  font-family: var(--sans);
+  font-synthesis: none;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+#root {
+  min-height: 100svh;
+}
