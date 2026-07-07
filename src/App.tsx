@@ -30,9 +30,11 @@ import {
   removeAnniversary,
   removeMessage,
   signInWithEmail,
+  signInWithPassword,
   signOut,
   toggleMessagePin,
   updateCouple,
+  updateLoginPassword,
   uploadPhoto,
   verifyEmailOtp,
 } from './lib/data'
@@ -277,6 +279,20 @@ function App() {
       setWorkspacePatch({ couple })
       setNotice({ type: 'success', text: '空间设置已保存。' })
     },
+    updatePassword: async (input: { password: string }) => {
+      if (isDemo) {
+        setNotice({ type: 'info', text: '演示模式不会保存登录密码。' })
+        return
+      }
+
+      try {
+        await updateLoginPassword(input.password)
+        setNotice({ type: 'success', text: '登录密码已设置，以后可以直接用邮箱和密码进入。' })
+      } catch (error) {
+        setNotice({ type: 'error', text: getErrorMessage(error) })
+        throw error
+      }
+    },
     uploadPhoto: async (input: { file: File; caption: string; takenAt: string; tags: string[] }) => {
       if (!workspace) {
         return
@@ -379,10 +395,26 @@ function LoginScreen({
   onNotice: (notice: Notice) => void
 }) {
   const [email, setEmail] = useState('')
+  const [authMode, setAuthMode] = useState<'password' | 'otp'>('password')
   const [otpSentTo, setOtpSentTo] = useState('')
+  const [password, setPassword] = useState('')
+  const [isPasswordSigningIn, setIsPasswordSigningIn] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [token, setToken] = useState('')
+
+  const signInByPassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsPasswordSigningIn(true)
+    try {
+      await signInWithPassword(email, password)
+      onNotice({ type: 'success', text: '登录成功，正在进入空间。' })
+    } catch (error) {
+      onNotice({ type: 'error', text: getErrorMessage(error) })
+    } finally {
+      setIsPasswordSigningIn(false)
+    }
+  }
 
   const sendCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -424,46 +456,91 @@ function LoginScreen({
 
         {isSupabaseConfigured ? (
           <>
-            <form className="login-form" onSubmit={sendCode}>
-              <label htmlFor="email">邮箱验证码登录</label>
-              <div className="field-row">
+            <div className="auth-tabs" role="tablist" aria-label="登录方式">
+              <button className={authMode === 'password' ? 'active' : ''} type="button" onClick={() => setAuthMode('password')}>
+                密码登录
+              </button>
+              <button className={authMode === 'otp' ? 'active' : ''} type="button" onClick={() => setAuthMode('otp')}>
+                验证码登录
+              </button>
+            </div>
+
+            {authMode === 'password' ? (
+              <form className="login-form" onSubmit={signInByPassword}>
+                <label htmlFor="password-email">邮箱</label>
                 <input
-                  id="email"
+                  autoComplete="email"
+                  id="password-email"
                   required
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
                 />
-                <button disabled={isSending} type="submit">
-                  {isSending ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                  发送验证码
-                </button>
-              </div>
-            </form>
-            {otpSentTo ? (
-              <form className="login-form otp-form" onSubmit={verifyCode}>
-                <label htmlFor="otp">输入邮箱里的数字验证码</label>
+                <label htmlFor="login-password">密码</label>
                 <div className="field-row">
                   <input
-                    autoComplete="one-time-code"
-                    id="otp"
-                    inputMode="numeric"
-                    maxLength={otpMaxLength}
-                    pattern="[0-9]{6,8}"
+                    autoComplete="current-password"
+                    id="login-password"
+                    minLength={8}
                     required
-                    value={token}
-                    onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, otpMaxLength))}
-                    placeholder="12345678"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="输入你的登录密码"
                   />
-                  <button disabled={isVerifying || token.length < otpMinLength} type="submit">
-                    {isVerifying ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                    验证进入
+                  <button disabled={isPasswordSigningIn || password.length < 8} type="submit">
+                    {isPasswordSigningIn ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                    登录
                   </button>
                 </div>
-                <p className="form-hint">验证码发送到 {otpSentTo}，不用点击邮件链接。</p>
+                <p className="form-hint">第一次需要先用验证码登录，在设置页给自己设置密码。</p>
               </form>
-            ) : null}
+            ) : (
+              <div className="otp-panel">
+                <form className="login-form" onSubmit={sendCode}>
+                  <label htmlFor="email">邮箱验证码登录</label>
+                  <div className="field-row">
+                    <input
+                      autoComplete="email"
+                      id="email"
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
+                    />
+                    <button disabled={isSending} type="submit">
+                      {isSending ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                      发送验证码
+                    </button>
+                  </div>
+                </form>
+                {otpSentTo ? (
+                  <form className="login-form otp-form" onSubmit={verifyCode}>
+                    <label htmlFor="otp">输入邮箱里的数字验证码</label>
+                    <div className="field-row">
+                      <input
+                        autoComplete="one-time-code"
+                        id="otp"
+                        inputMode="numeric"
+                        maxLength={otpMaxLength}
+                        pattern="[0-9]{6,8}"
+                        required
+                        value={token}
+                        onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, otpMaxLength))}
+                        placeholder="12345678"
+                      />
+                      <button disabled={isVerifying || token.length < otpMinLength} type="submit">
+                        {isVerifying ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                        验证进入
+                      </button>
+                    </div>
+                    <p className="form-hint">验证码发送到 {otpSentTo}，不用点击邮件链接。</p>
+                  </form>
+                ) : null}
+              </div>
+            )}
           </>
         ) : (
           <div className="setup-note">
@@ -499,6 +576,7 @@ function AppShell({
     signOut: () => Promise<void>
     togglePin: (message: Message) => Promise<void>
     updateCouple: (input: { name: string; startDate: string }) => Promise<void>
+    updatePassword: (input: { password: string }) => Promise<void>
     uploadPhoto: (input: { file: File; caption: string; takenAt: string; tags: string[] }) => Promise<void>
   }
   isDemo: boolean
@@ -526,7 +604,15 @@ function AppShell({
       />
     ),
     photos: <PhotoWall photos={workspace.photos} onDelete={actions.deletePhoto} onUpload={actions.uploadPhoto} />,
-    settings: <SettingsPage isDemo={isDemo} onSignOut={actions.signOut} onUpdateCouple={actions.updateCouple} workspace={workspace} />,
+    settings: (
+      <SettingsPage
+        isDemo={isDemo}
+        onSignOut={actions.signOut}
+        onUpdateCouple={actions.updateCouple}
+        onUpdatePassword={actions.updatePassword}
+        workspace={workspace}
+      />
+    ),
   } satisfies Record<RouteId, ReactNode>
 
   return (
@@ -1083,11 +1169,13 @@ function SettingsPage({
   isDemo,
   onSignOut,
   onUpdateCouple,
+  onUpdatePassword,
   workspace,
 }: {
   isDemo: boolean
   onSignOut: () => Promise<void>
   onUpdateCouple: (input: { name: string; startDate: string }) => Promise<void>
+  onUpdatePassword: (input: { password: string }) => Promise<void>
   workspace: WorkspaceData
 }) {
   return (
@@ -1112,6 +1200,7 @@ function SettingsPage({
           </dl>
         </article>
         <CoupleSettingsForm onSave={onUpdateCouple} workspace={workspace} />
+        <PasswordSettingsForm onSave={onUpdatePassword} />
         <article className="settings-card">
           <h3>上线检查</h3>
           <ul className="check-list">
@@ -1128,6 +1217,68 @@ function SettingsPage({
         {isDemo ? '退出演示' : '退出登录'}
       </button>
     </main>
+  )
+}
+
+function PasswordSettingsForm({ onSave }: { onSave: (input: { password: string }) => Promise<void> }) {
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [password, setPassword] = useState('')
+  const passwordsMatch = password === confirmPassword
+  const canSave = password.length >= 8 && passwordsMatch
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!canSave) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave({ password })
+      setPassword('')
+      setConfirmPassword('')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <article className="settings-card">
+      <h3>设置登录密码</h3>
+      <p className="settings-copy">设置后可以在登录页直接用邮箱和密码进入；验证码登录仍然保留。</p>
+      <form className="settings-form" onSubmit={submit}>
+        <label>
+          新密码
+          <input
+            autoComplete="new-password"
+            minLength={8}
+            required
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="至少 8 位"
+          />
+        </label>
+        <label>
+          再输入一次
+          <input
+            autoComplete="new-password"
+            minLength={8}
+            required
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            placeholder="确认新密码"
+          />
+        </label>
+        {!passwordsMatch ? <p className="form-hint error-text">两次输入的密码不一样。</p> : null}
+        <button disabled={isSaving || !canSave} type="submit">
+          {isSaving ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+          保存密码
+        </button>
+      </form>
+    </article>
   )
 }
 

@@ -15,7 +15,7 @@ npm run dev
 ## Supabase 设置
 
 1. 创建 Supabase 项目。
-2. 在 Authentication 中开启 Email OTP，并把站点 URL 设置为 GitHub Pages 地址；本地开发时加入 `http://localhost:5173`。
+2. 在 Authentication 中开启 Email 登录方式，并把站点 URL 设置为 GitHub Pages 地址；本地开发时加入 `http://localhost:5173`。
 3. 如果是 2026-06-03 之后创建的 Supabase 免费项目，需要先在 Authentication -> SMTP Settings 启用自己的 SMTP（例如 QQ 邮箱 SMTP），否则默认邮件服务可能不会使用自定义模板。
 4. 在 Authentication -> Email Templates -> Magic Link or OTP 中加入 `{{ .Token }}`，让邮件显示数字验证码，并点击页面底部的 Save。示例正文：
    ```html
@@ -49,3 +49,8 @@ npm run dev
 所有业务表都启用 RLS，并通过 `couple_id` 限制只有成员可读写对应空间的数据。
 
 首页的相恋天数来自 `couples.start_date`，可以在应用的“设置”页自行修改。其他纪念日可以在“纪念日”页新增、删除。
+
+## 登录方式
+
+- 验证码登录：输入邮箱，收到数字验证码后在页面里填写。
+- 密码登录：第一次先用验证码进入空间，然后在“设置 -> 设置登录密码”里给自己的账号设置密码。设置完成后，之后可以直接用邮箱和密码登录。

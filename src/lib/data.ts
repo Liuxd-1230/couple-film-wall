@@ -41,6 +41,23 @@ export async function signInWithEmail(email: string) {
   }
 }
 
+export async function signInWithPassword(email: string, password: string) {
+  const client = requireSupabase()
+  const {
+    data: { session },
+    error,
+  } = await client.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return session
+}
+
 export async function verifyEmailOtp(email: string, token: string) {
   const client = requireSupabase()
   const {
@@ -57,6 +74,17 @@ export async function verifyEmailOtp(email: string, token: string) {
   }
 
   return session
+}
+
+export async function updateLoginPassword(password: string) {
+  const client = requireSupabase()
+  const { error } = await client.auth.updateUser({
+    password,
+  })
+
+  if (error) {
+    throw error
+  }
 }
 
 export async function signOut() {
