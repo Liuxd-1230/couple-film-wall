@@ -425,12 +425,28 @@ p {
   transform: translateY(-2px) rotate(0deg);
 }
 
-.polaroid-card img,
+.photo-open-button,
 .image-missing {
   aspect-ratio: 4 / 3;
   background: var(--paper-deep);
   border-radius: 3px;
+  overflow: hidden;
   object-fit: cover;
+  width: 100%;
+}
+
+.photo-open-button {
+  align-items: center;
+  border: 0;
+  cursor: zoom-in;
+  display: flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.photo-open-button img {
+  height: 100%;
+  object-fit: contain;
   width: 100%;
 }
 
@@ -463,6 +479,82 @@ p {
 .polaroid-caption span {
   color: var(--sage);
   font-size: 12px;
+}
+
+.photo-viewer {
+  align-items: center;
+  background: rgba(47, 35, 28, 0.68);
+  backdrop-filter: blur(5px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  inset: 0;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  position: fixed;
+  z-index: 20;
+}
+
+.photo-viewer-toolbar {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin: 0 auto;
+  max-width: 1120px;
+  width: 100%;
+}
+
+.photo-viewer-toolbar button {
+  align-items: center;
+  background: rgba(255, 250, 240, 0.9);
+  border: 1px solid rgba(215, 191, 160, 0.56);
+  border-radius: var(--radius);
+  color: var(--ink);
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  width: 42px;
+}
+
+.photo-viewer-stage {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  width: 100%;
+}
+
+.photo-viewer-stage img {
+  border: 10px solid rgba(255, 253, 247, 0.92);
+  border-radius: 5px;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.34);
+  max-height: min(76svh, 820px);
+  max-width: min(92vw, 1040px);
+  object-fit: contain;
+  transform-origin: center;
+  transition: transform 80ms linear;
+  user-select: none;
+}
+
+.photo-viewer-caption {
+  color: var(--surface);
+  display: grid;
+  gap: 5px;
+  justify-self: center;
+  max-width: min(92vw, 760px);
+  text-align: center;
+}
+
+.photo-viewer-caption p {
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.photo-viewer-caption time {
+  color: rgba(255, 250, 240, 0.75);
+  font-size: 13px;
 }
 
 .side-form {
@@ -886,5 +978,19 @@ textarea:focus {
   .card-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .photo-viewer {
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .photo-viewer-stage img {
+    border-width: 6px;
+    max-height: 72svh;
+    max-width: 96vw;
+  }
+
+  .photo-viewer-caption p {
+    font-size: 18px;
   }
 }

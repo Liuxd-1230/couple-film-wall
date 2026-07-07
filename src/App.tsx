@@ -1,5 +1,6 @@
-import type { FormEvent, ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent, PointerEvent, ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   CalendarHeart,
   Camera,
@@ -11,10 +12,12 @@ import {
   LogOut,
   MessageCircleHeart,
   Pin,
+  RotateCcw,
   Settings,
   Sparkles,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import './App.css'
 import {
@@ -640,6 +643,7 @@ function PhotoWall({
   photos: Photo[]
 }) {
   const [activeTag, setActiveTag] = useState('全部')
+  const [viewerPhoto, setViewerPhoto] = useState<Photo | null>(null)
   const tags = useMemo(() => ['全部', ...Array.from(new Set(photos.flatMap((photo) => photo.tags)))], [photos])
   const filtered = activeTag === '全部' ? photos : photos.filter((photo) => photo.tags.includes(activeTag))
 
@@ -657,7 +661,13 @@ function PhotoWall({
         <div className="photo-masonry">
           {filtered.map((photo, index) => (
             <article className="polaroid-card" key={photo.id} style={{ rotate: `${index % 2 === 0 ? -1.3 : 1.1}deg` }}>
-              {photo.signedUrl ? <img alt={photo.caption} src={photo.signedUrl} /> : <div className="image-missing">照片链接过期</div>}
+              {photo.signedUrl ? (
+                <button className="photo-open-button" type="button" onClick={() => setViewerPhoto(photo)} aria-label={`查看照片：${photo.caption}`}>
+                  <img alt={photo.caption} src={photo.signedUrl} />
+                </button>
+              ) : (
+                <div className="image-missing">照片链接过期</div>
+              )}
               <div className="polaroid-caption">
                 <p>{photo.caption}</p>
                 <time>{formatFullDate(photo.taken_at)}</time>
@@ -675,7 +685,133 @@ function PhotoWall({
         </div>
       </section>
       <PhotoUploadForm onUpload={onUpload} />
+      {viewerPhoto ? createPortal(<PhotoViewer photo={viewerPhoto} onClose={() => setViewerPhoto(null)} />, document.body) : null}
     </main>
+  )
+}
+
+function PhotoViewer({ onClose, photo }: { onClose: () => void; photo: Photo }) {
+  const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
+  const gestureRef = useRef<{
+    distance: number
+    scale: number
+    x: number
+    y: number
+    pointers: Map<number, { x: number; y: number }>
+  }>({
+    distance: 0,
+    pointers: new Map(),
+    scale: 1,
+    x: 0,
+    y: 0,
+  })
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onClose])
+
+  const resetZoom = () => {
+    gestureRef.current = { distance: 0, pointers: new Map(), scale: 1, x: 0, y: 0 }
+    setTransform({ scale: 1, x: 0, y: 0 })
+  }
+
+  const updatePointer = (event: PointerEvent<HTMLDivElement>) => {
+    gestureRef.current.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  }
+
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    updatePointer(event)
+    const points = [...gestureRef.current.pointers.values()]
+    gestureRef.current = {
+      ...gestureRef.current,
+      distance: points.length >= 2 ? distanceBetween(points[0], points[1]) : 0,
+      scale: transform.scale,
+      x: transform.x,
+      y: transform.y,
+    }
+  }
+
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!gestureRef.current.pointers.has(event.pointerId)) {
+      return
+    }
+
+    const previous = gestureRef.current.pointers.get(event.pointerId)
+    updatePointer(event)
+    const points = [...gestureRef.current.pointers.values()]
+
+    if (points.length >= 2 && gestureRef.current.distance > 0) {
+      const nextScale = clamp((gestureRef.current.scale * distanceBetween(points[0], points[1])) / gestureRef.current.distance, 1, 4)
+      setTransform((current) => ({ ...current, scale: nextScale }))
+      return
+    }
+
+    if (previous && transform.scale > 1) {
+      setTransform((current) => ({
+        ...current,
+        x: current.x + event.clientX - previous.x,
+        y: current.y + event.clientY - previous.y,
+      }))
+    }
+  }
+
+  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    gestureRef.current.pointers.delete(event.pointerId)
+    const points = [...gestureRef.current.pointers.values()]
+    gestureRef.current = {
+      ...gestureRef.current,
+      distance: points.length >= 2 ? distanceBetween(points[0], points[1]) : 0,
+      scale: transform.scale,
+      x: transform.x,
+      y: transform.y,
+    }
+  }
+
+  return (
+    <div className="photo-viewer" role="dialog" aria-modal="true" aria-label="照片查看器">
+      <div className="photo-viewer-toolbar">
+        <button type="button" onClick={resetZoom} title="重置缩放" aria-label="重置照片缩放">
+          <RotateCcw size={18} />
+        </button>
+        <button type="button" onClick={onClose} title="关闭" aria-label="关闭照片查看器">
+          <X size={20} />
+        </button>
+      </div>
+      <div
+        className="photo-viewer-stage"
+        onDoubleClick={resetZoom}
+        onPointerCancel={onPointerUp}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        {photo.signedUrl ? (
+          <img
+            alt={photo.caption}
+            draggable={false}
+            src={photo.signedUrl}
+            style={{ transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})` }}
+          />
+        ) : null}
+      </div>
+      <div className="photo-viewer-caption">
+        <p>{photo.caption}</p>
+        <time>{formatFullDate(photo.taken_at)}</time>
+      </div>
+    </div>
   )
 }
 
@@ -1058,6 +1194,14 @@ function getErrorMessage(error: unknown) {
   }
 
   return '操作失败，请稍后再试。'
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function distanceBetween(first: { x: number; y: number }, second: { x: number; y: number }) {
+  return Math.hypot(first.x - second.x, first.y - second.y)
 }
 
 export default App
