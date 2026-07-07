@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { compressImage } from './image'
+import { imageFileExtension, prepareImageUpload } from './image'
 import { photoBucket, requireSupabase } from './supabase'
 import type { Anniversary, Couple, CoupleMember, Message, Photo, WorkspaceData } from '../types'
 
@@ -182,10 +182,10 @@ export async function uploadPhoto(input: {
   tags: string[]
 }) {
   const client = requireSupabase()
-  const compressed = await compressImage(input.file)
-  const path = `${input.coupleId}/${input.userId}/${crypto.randomUUID()}.jpg`
-  const { error: uploadError } = await client.storage.from(photoBucket).upload(path, compressed, {
-    contentType: compressed.type,
+  const uploadFile = await prepareImageUpload(input.file)
+  const path = `${input.coupleId}/${input.userId}/${crypto.randomUUID()}.${imageFileExtension(uploadFile)}`
+  const { error: uploadError } = await client.storage.from(photoBucket).upload(path, uploadFile, {
+    contentType: uploadFile.type || 'application/octet-stream',
     upsert: false,
   })
 

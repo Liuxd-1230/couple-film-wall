@@ -35,7 +35,7 @@ import {
 } from './lib/data'
 import { daysBetween, daysUntilAnnualDate, formatFullDate, formatShortDate, toDateInputValue } from './lib/date'
 import { demoWorkspace } from './lib/demoData'
-import { compressImage } from './lib/image'
+import { prepareImageUpload } from './lib/image'
 import { isSupabaseConfigured } from './lib/supabase'
 import type { Anniversary, Message, Photo, RouteId, TimelineItem, WorkspaceData } from './types'
 
@@ -261,34 +261,39 @@ function App() {
         return
       }
 
-      if (isDemo) {
-        const compressed = await compressImage(input.file)
-        const photo: Photo = {
-          id: crypto.randomUUID(),
-          caption: input.caption,
-          couple_id: workspace.couple.id,
-          created_at: new Date().toISOString(),
-          signedUrl: URL.createObjectURL(compressed),
-          storage_path: `demo/${compressed.name}`,
-          tags: input.tags,
-          taken_at: input.takenAt,
-          user_id: workspace.member.user_id,
+      try {
+        if (isDemo) {
+          const uploadFile = await prepareImageUpload(input.file)
+          const photo: Photo = {
+            id: crypto.randomUUID(),
+            caption: input.caption,
+            couple_id: workspace.couple.id,
+            created_at: new Date().toISOString(),
+            signedUrl: URL.createObjectURL(uploadFile),
+            storage_path: `demo/${uploadFile.name}`,
+            tags: input.tags,
+            taken_at: input.takenAt,
+            user_id: workspace.member.user_id,
+          }
+          setWorkspacePatch({ photos: [photo, ...workspace.photos] })
+          setNotice({ type: 'success', text: '演示照片已加入照片墙。' })
+          return
         }
-        setWorkspacePatch({ photos: [photo, ...workspace.photos] })
-        setNotice({ type: 'success', text: '演示照片已加入照片墙。' })
-        return
-      }
 
-      const photo = await uploadPhoto({
-        caption: input.caption,
-        coupleId: workspace.couple.id,
-        file: input.file,
-        tags: input.tags,
-        takenAt: input.takenAt,
-        userId: workspace.member.user_id,
-      })
-      setWorkspacePatch({ photos: [photo, ...workspace.photos] })
-      setNotice({ type: 'success', text: '照片已上传。' })
+        const photo = await uploadPhoto({
+          caption: input.caption,
+          coupleId: workspace.couple.id,
+          file: input.file,
+          tags: input.tags,
+          takenAt: input.takenAt,
+          userId: workspace.member.user_id,
+        })
+        setWorkspacePatch({ photos: [photo, ...workspace.photos] })
+        setNotice({ type: 'success', text: '照片已上传。' })
+      } catch (error) {
+        setNotice({ type: 'error', text: getErrorMessage(error) })
+        throw error
+      }
     },
   }
 
@@ -703,6 +708,8 @@ function PhotoUploadForm({
       setCaption('')
       setFile(null)
       setTags('')
+    } catch {
+      return
     } finally {
       setIsSaving(false)
     }

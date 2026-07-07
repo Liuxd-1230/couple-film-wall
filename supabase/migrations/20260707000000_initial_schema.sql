@@ -210,8 +210,8 @@ values (
   'couple-photos',
   'couple-photos',
   false,
-  10485760,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/heic']
+  26214400,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
 )
 on conflict (id) do update
 set
@@ -234,6 +234,22 @@ create policy "members can upload own photo objects"
 on storage.objects
 for insert
 to authenticated
+with check (
+  bucket_id = 'couple-photos'
+  and public.is_couple_member(((storage.foldername(name))[1])::uuid)
+  and (storage.foldername(name))[2] = (select auth.uid())::text
+);
+
+drop policy if exists "members can update own photo objects" on storage.objects;
+create policy "members can update own photo objects"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'couple-photos'
+  and public.is_couple_member(((storage.foldername(name))[1])::uuid)
+  and (storage.foldername(name))[2] = (select auth.uid())::text
+)
 with check (
   bucket_id = 'couple-photos'
   and public.is_couple_member(((storage.foldername(name))[1])::uuid)

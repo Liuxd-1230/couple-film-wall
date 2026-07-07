@@ -1,3 +1,41 @@
+export const maxPhotoUploadBytes = 25 * 1024 * 1024
+
+export async function prepareImageUpload(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请选择图片文件。')
+  }
+
+  try {
+    const compressed = await compressImage(file)
+    if (compressed.size <= maxPhotoUploadBytes) {
+      return compressed
+    }
+  } catch {
+    if (file.size > maxPhotoUploadBytes) {
+      throw new Error('这张照片暂时无法压缩，而且超过 25MB。请换一张更小的照片再试。')
+    }
+  }
+
+  if (file.size > maxPhotoUploadBytes) {
+    throw new Error('这张照片超过 25MB，请换一张更小的照片再试。')
+  }
+
+  return file
+}
+
+export function imageFileExtension(file: File) {
+  const fromType = file.type.split('/')[1]?.toLowerCase()
+  if (fromType === 'jpeg' || fromType === 'jpg') {
+    return 'jpg'
+  }
+  if (fromType === 'png' || fromType === 'webp' || fromType === 'heic' || fromType === 'heif') {
+    return fromType
+  }
+
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  return fromName && /^[a-z0-9]+$/.test(fromName) ? fromName : 'jpg'
+}
+
 export async function compressImage(file: File, maxSide = 1800, quality = 0.84) {
   if (!file.type.startsWith('image/')) {
     throw new Error('请选择图片文件。')
