@@ -473,6 +473,7 @@ p {
 
 .side-form form,
 .login-form,
+.settings-form,
 .settings-card dl {
   display: grid;
   gap: 14px;
@@ -724,6 +725,26 @@ textarea:focus {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.otp-form {
+  background: rgba(102, 119, 90, 0.08);
+  border: 1px solid rgba(102, 119, 90, 0.2);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.otp-form input {
+  font-family: var(--serif);
+  font-size: 24px;
+  letter-spacing: 0.26em;
+  text-align: center;
+}
+
+.form-hint,
+.settings-copy {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .setup-note {
   background: rgba(102, 119, 90, 0.1);
   border: 1px solid rgba(102, 119, 90, 0.24);
@@ -740,6 +761,24 @@ textarea:focus {
 
 .ghost-button {
   justify-content: center;
+  padding: 9px 14px;
+  width: fit-content;
+}
+
+.settings-form {
+  margin-top: 14px;
+}
+
+.settings-form button {
+  align-items: center;
+  background: var(--rose-deep);
+  border: 1px solid rgba(143, 73, 63, 0.22);
+  border-radius: var(--radius);
+  color: var(--surface);
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 40px;
   padding: 9px 14px;
   width: fit-content;
 }

@@ -16,9 +16,15 @@ npm run dev
 
 1. 创建 Supabase 项目。
 2. 在 Authentication 中开启 Email OTP，并把站点 URL 设置为 GitHub Pages 地址；本地开发时加入 `http://localhost:5173`。
-3. 在 SQL Editor 执行 `supabase/migrations/20260707000000_initial_schema.sql`。
-4. 两个人都用邮箱登录一次后，修改并执行 `supabase/seed-members.sql`，把两个人加入同一个 `couple_id`。
-5. 前端环境变量使用 publishable key 或 anon key，不要使用 service role key。
+3. 在 Authentication -> Email Templates -> Magic Link 中加入 `{{ .Token }}`，让邮件显示 6 位验证码。示例正文：
+   ```html
+   <h2>你的登录验证码</h2>
+   <p>请输入这个验证码：{{ .Token }}</p>
+   <p>验证码会在短时间后过期。如果不是你本人操作，可以忽略这封邮件。</p>
+   ```
+4. 在 SQL Editor 执行 `supabase/migrations/20260707000000_initial_schema.sql`。
+5. 两个人都用邮箱登录一次后，修改并执行 `supabase/seed-members.sql`，把两个人加入同一个 `couple_id`。
+6. 前端环境变量使用 publishable key 或 anon key，不要使用 service role key。
 
 ## GitHub Pages 部署
 
@@ -40,3 +46,5 @@ npm run dev
 - `anniversaries`：纪念日。
 
 所有业务表都启用 RLS，并通过 `couple_id` 限制只有成员可读写对应空间的数据。
+
+首页的相恋天数来自 `couples.start_date`，可以在应用的“设置”页自行修改。其他纪念日可以在“纪念日”页新增、删除。

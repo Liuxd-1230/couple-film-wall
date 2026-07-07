@@ -32,15 +32,31 @@ export function listenToAuthChanges(onChange: (session: Session | null) => void)
 
 export async function signInWithEmail(email: string) {
   const client = requireSupabase()
-  const redirectTo = `${window.location.origin}${window.location.pathname}`
   const { error } = await client.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: redirectTo },
   })
 
   if (error) {
     throw error
   }
+}
+
+export async function verifyEmailOtp(email: string, token: string) {
+  const client = requireSupabase()
+  const {
+    data: { session },
+    error,
+  } = await client.auth.verifyOtp({
+    email,
+    token,
+    type: 'email',
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return session
 }
 
 export async function signOut() {
@@ -81,6 +97,25 @@ export async function loadWorkspace(session: Session): Promise<WorkspaceData | n
     messages,
     anniversaries,
   }
+}
+
+export async function updateCouple(input: { coupleId: string; name: string; startDate: string }) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from('couples')
+    .update({
+      name: input.name.trim(),
+      start_date: input.startDate,
+    })
+    .eq('id', input.coupleId)
+    .select('*')
+    .single<Couple>()
+
+  if (error) {
+    throw error
+  }
+
+  return data
 }
 
 export async function fetchPhotos(coupleId: string) {

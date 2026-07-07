@@ -29,7 +29,9 @@ import {
   signInWithEmail,
   signOut,
   toggleMessagePin,
+  updateCouple,
   uploadPhoto,
+  verifyEmailOtp,
 } from './lib/data'
 import { daysBetween, daysUntilAnnualDate, formatFullDate, formatShortDate, toDateInputValue } from './lib/date'
 import { demoWorkspace } from './lib/demoData'
@@ -229,6 +231,31 @@ function App() {
         messages: workspace.messages.map((item) => (item.id === updated.id ? updated : item)),
       })
     },
+    updateCouple: async (input: { name: string; startDate: string }) => {
+      if (!workspace) {
+        return
+      }
+
+      if (isDemo) {
+        setWorkspacePatch({
+          couple: {
+            ...workspace.couple,
+            name: input.name,
+            start_date: input.startDate,
+          },
+        })
+        setNotice({ type: 'success', text: '演示空间设置已保存。' })
+        return
+      }
+
+      const couple = await updateCouple({
+        coupleId: workspace.couple.id,
+        name: input.name,
+        startDate: input.startDate,
+      })
+      setWorkspacePatch({ couple })
+      setNotice({ type: 'success', text: '空间设置已保存。' })
+    },
     uploadPhoto: async (input: { file: File; caption: string; takenAt: string; tags: string[] }) => {
       if (!workspace) {
         return
@@ -326,18 +353,36 @@ function LoginScreen({
   onNotice: (notice: Notice) => void
 }) {
   const [email, setEmail] = useState('')
+  const [otpSentTo, setOtpSentTo] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [token, setToken] = useState('')
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const sendCode = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setIsSending(true)
     try {
       await signInWithEmail(email)
-      onNotice({ type: 'success', text: '登录邮件已发送，请回到邮箱点击链接。' })
+      setOtpSentTo(email)
+      setToken('')
+      onNotice({ type: 'success', text: '验证码已发送，请在邮箱里查看 6 位数字。' })
     } catch (error) {
       onNotice({ type: 'error', text: getErrorMessage(error) })
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const verifyCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsVerifying(true)
+    try {
+      await verifyEmailOtp(otpSentTo, token.replace(/\D/g, ''))
+      onNotice({ type: 'success', text: '验证成功，正在进入空间。' })
+    } catch (error) {
+      onNotice({ type: 'error', text: getErrorMessage(error) })
+    } finally {
+      setIsVerifying(false)
     }
   }
 
@@ -352,23 +397,48 @@ function LoginScreen({
         <p className="login-copy">私密照片墙、留言板、时间线和纪念日，只给你们两个人进入。</p>
 
         {isSupabaseConfigured ? (
-          <form className="login-form" onSubmit={submit}>
-            <label htmlFor="email">邮箱验证码登录</label>
-            <div className="field-row">
-              <input
-                id="email"
-                required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-              />
-              <button disabled={isSending} type="submit">
-                {isSending ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                发送
-              </button>
-            </div>
-          </form>
+          <>
+            <form className="login-form" onSubmit={sendCode}>
+              <label htmlFor="email">邮箱验证码登录</label>
+              <div className="field-row">
+                <input
+                  id="email"
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                />
+                <button disabled={isSending} type="submit">
+                  {isSending ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                  发送验证码
+                </button>
+              </div>
+            </form>
+            {otpSentTo ? (
+              <form className="login-form otp-form" onSubmit={verifyCode}>
+                <label htmlFor="otp">输入邮箱里的 6 位验证码</label>
+                <div className="field-row">
+                  <input
+                    autoComplete="one-time-code"
+                    id="otp"
+                    inputMode="numeric"
+                    maxLength={6}
+                    pattern="[0-9]{6}"
+                    required
+                    value={token}
+                    onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                  />
+                  <button disabled={isVerifying || token.length !== 6} type="submit">
+                    {isVerifying ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                    验证进入
+                  </button>
+                </div>
+                <p className="form-hint">验证码发送到 {otpSentTo}，不用点击邮件链接。</p>
+              </form>
+            ) : null}
+          </>
         ) : (
           <div className="setup-note">
             <strong>还没有配置 Supabase。</strong>
@@ -402,6 +472,7 @@ function AppShell({
     deletePhoto: (photo: Photo) => Promise<void>
     signOut: () => Promise<void>
     togglePin: (message: Message) => Promise<void>
+    updateCouple: (input: { name: string; startDate: string }) => Promise<void>
     uploadPhoto: (input: { file: File; caption: string; takenAt: string; tags: string[] }) => Promise<void>
   }
   isDemo: boolean
@@ -429,7 +500,7 @@ function AppShell({
       />
     ),
     photos: <PhotoWall photos={workspace.photos} onDelete={actions.deletePhoto} onUpload={actions.uploadPhoto} />,
-    settings: <SettingsPage isDemo={isDemo} onSignOut={actions.signOut} workspace={workspace} />,
+    settings: <SettingsPage isDemo={isDemo} onSignOut={actions.signOut} onUpdateCouple={actions.updateCouple} workspace={workspace} />,
   } satisfies Record<RouteId, ReactNode>
 
   return (
@@ -823,10 +894,12 @@ function AnniversaryForm({ onCreate }: { onCreate: (input: { title: string; date
 function SettingsPage({
   isDemo,
   onSignOut,
+  onUpdateCouple,
   workspace,
 }: {
   isDemo: boolean
   onSignOut: () => Promise<void>
+  onUpdateCouple: (input: { name: string; startDate: string }) => Promise<void>
   workspace: WorkspaceData
 }) {
   return (
@@ -850,6 +923,7 @@ function SettingsPage({
             </div>
           </dl>
         </article>
+        <CoupleSettingsForm onSave={onUpdateCouple} workspace={workspace} />
         <article className="settings-card">
           <h3>上线检查</h3>
           <ul className="check-list">
@@ -866,6 +940,54 @@ function SettingsPage({
         {isDemo ? '退出演示' : '退出登录'}
       </button>
     </main>
+  )
+}
+
+function CoupleSettingsForm({
+  onSave,
+  workspace,
+}: {
+  onSave: (input: { name: string; startDate: string }) => Promise<void>
+  workspace: WorkspaceData
+}) {
+  const [isSaving, setIsSaving] = useState(false)
+  const [name, setName] = useState(workspace.couple.name)
+  const [startDate, setStartDate] = useState(workspace.couple.start_date)
+
+  useEffect(() => {
+    setName(workspace.couple.name)
+    setStartDate(workspace.couple.start_date)
+  }, [workspace.couple.name, workspace.couple.start_date])
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsSaving(true)
+    try {
+      await onSave({ name, startDate })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <article className="settings-card">
+      <h3>自己设置纪念起点</h3>
+      <p className="settings-copy">首页的相恋天数会按这里的日期计算；其他纪念日可以在“纪念日”页面继续添加。</p>
+      <form className="settings-form" onSubmit={submit}>
+        <label>
+          空间名称
+          <input required value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label>
+          在一起日期
+          <input required type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        </label>
+        <button disabled={isSaving} type="submit">
+          {isSaving ? <Loader2 className="spin" size={18} /> : <CalendarHeart size={18} />}
+          保存设置
+        </button>
+      </form>
+    </article>
   )
 }
 

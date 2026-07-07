@@ -86,6 +86,14 @@ for select
 to authenticated
 using (public.is_couple_member(id));
 
+drop policy if exists "members can update their couple" on public.couples;
+create policy "members can update their couple"
+on public.couples
+for update
+to authenticated
+using (public.is_couple_member(id))
+with check (public.is_couple_member(id));
+
 drop policy if exists "users can read their own membership" on public.couple_members;
 create policy "users can read their own membership"
 on public.couple_members
@@ -181,7 +189,7 @@ to authenticated
 using (public.is_couple_member(couple_id));
 
 grant usage on schema public to authenticated;
-grant select on public.couples to authenticated;
+grant select, update on public.couples to authenticated;
 grant select on public.couple_members to authenticated;
 grant select, insert, update, delete on public.photos to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
