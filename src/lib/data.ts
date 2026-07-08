@@ -244,6 +244,28 @@ export async function uploadPhoto(input: {
   return { ...data, signedUrl: signed?.signedUrl }
 }
 
+export async function updatePhoto(input: { id: string; caption: string; takenAt: string; tags: string[] }) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from('photos')
+    .update({
+      caption: input.caption.trim(),
+      tags: input.tags,
+      taken_at: input.takenAt,
+    })
+    .eq('id', input.id)
+    .select('*')
+    .single<Photo>()
+
+  if (error) {
+    throw error
+  }
+
+  const { data: signed } = await client.storage.from(photoBucket).createSignedUrl(data.storage_path, 60 * 60)
+
+  return { ...data, signedUrl: signed?.signedUrl }
+}
+
 export async function deletePhoto(photo: Photo) {
   const client = requireSupabase()
   const { error: storageError } = await client.storage.from(photoBucket).remove([photo.storage_path])

@@ -2,6 +2,8 @@
 
 一个部署在 GitHub Pages、后端使用 Supabase 的双人私密情侣空间。首版包含照片墙、留言板、时间线、纪念日和设置页。
 
+照片墙支持搜索、标签/日期筛选、照片详情查看和照片信息编辑。两位成员都可以共同编辑照片文案、拍摄日期和标签，但不能从前端修改照片归属或 Storage 路径。
+
 ## 本地运行
 
 ```bash
@@ -23,7 +25,7 @@ npm run dev
    <p>请输入这个验证码：{{ .Token }}</p>
    <p>验证码会在短时间后过期。如果不是你本人操作，可以忽略这封邮件。</p>
    ```
-5. 在 SQL Editor 执行 `supabase/migrations/20260707000000_initial_schema.sql`。
+5. 在 SQL Editor 执行 `supabase/migrations/20260707000000_initial_schema.sql`。如果是已有项目，也要按顺序执行后续迁移，例如 `supabase/migrations/20260708123500_allow_couple_photo_metadata_edits.sql`。
 6. 两个人都用邮箱登录一次后，修改并执行 `supabase/seed-members.sql`，把两个人加入同一个 `couple_id`。
 7. 前端环境变量使用 publishable key 或 anon key，不要使用 service role key。
 

@@ -116,12 +116,13 @@ to authenticated
 with check (public.is_couple_member(couple_id) and user_id = (select auth.uid()));
 
 drop policy if exists "members can update own photos" on public.photos;
-create policy "members can update own photos"
+drop policy if exists "members can update photos in own couple" on public.photos;
+create policy "members can update photos in own couple"
 on public.photos
 for update
 to authenticated
-using (public.is_couple_member(couple_id) and user_id = (select auth.uid()))
-with check (public.is_couple_member(couple_id) and user_id = (select auth.uid()));
+using (public.is_couple_member(couple_id))
+with check (public.is_couple_member(couple_id));
 
 drop policy if exists "members can delete own photos" on public.photos;
 create policy "members can delete own photos"
@@ -191,7 +192,8 @@ using (public.is_couple_member(couple_id));
 grant usage on schema public to authenticated;
 grant select, update on public.couples to authenticated;
 grant select on public.couple_members to authenticated;
-grant select, insert, update, delete on public.photos to authenticated;
+grant select, insert, delete on public.photos to authenticated;
+grant update (caption, taken_at, tags) on public.photos to authenticated;
 grant select, insert, update, delete on public.messages to authenticated;
 grant select, insert, update, delete on public.anniversaries to authenticated;
 grant execute on function public.is_couple_member(uuid) to authenticated;

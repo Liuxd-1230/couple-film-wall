@@ -36,6 +36,7 @@ import {
   toggleMessagePin,
   updateCouple,
   updateLoginPassword,
+  updatePhoto,
   uploadPhoto,
   verifyEmailOtp,
 } from './lib/data'
@@ -296,6 +297,35 @@ function App() {
         setNotice({ type: 'error', text: getErrorMessage(error) })
         throw error
       }
+    },
+    updatePhoto: async (photo: Photo, input: { caption: string; takenAt: string; tags: string[] }) => {
+      if (!workspace) {
+        return photo
+      }
+
+      if (isDemo) {
+        const updated: Photo = {
+          ...photo,
+          caption: input.caption.trim(),
+          tags: input.tags,
+          taken_at: input.takenAt,
+        }
+        setWorkspacePatch({
+          photos: workspace.photos.map((item) => (item.id === updated.id ? updated : item)),
+        })
+        setNotice({ type: 'success', text: '演示照片信息已更新。' })
+        return updated
+      }
+
+      const updated = await updatePhoto({
+        id: photo.id,
+        ...input,
+      })
+      setWorkspacePatch({
+        photos: workspace.photos.map((item) => (item.id === updated.id ? updated : item)),
+      })
+      setNotice({ type: 'success', text: '照片信息已更新。' })
+      return updated
     },
     uploadPhoto: async (input: { file: File; caption: string; takenAt: string; tags: string[] }) => {
       if (!workspace) {
@@ -603,6 +633,7 @@ function AppShell({
     togglePin: (message: Message) => Promise<void>
     updateCouple: (input: { name: string; startDate: string }) => Promise<void>
     updatePassword: (input: { password: string }) => Promise<void>
+    updatePhoto: (photo: Photo, input: { caption: string; takenAt: string; tags: string[] }) => Promise<Photo>
     uploadPhoto: (input: { file: File; caption: string; takenAt: string; tags: string[] }) => Promise<void>
   }
   isDemo: boolean
@@ -631,7 +662,14 @@ function AppShell({
         onTogglePin={actions.togglePin}
       />
     ),
-    photos: <PhotoWall photos={workspace.photos} onDelete={actions.deletePhoto} onUpload={actions.uploadPhoto} />,
+    photos: (
+      <PhotoWall
+        photos={workspace.photos}
+        onDelete={actions.deletePhoto}
+        onUpdate={actions.updatePhoto}
+        onUpload={actions.uploadPhoto}
+      />
+    ),
     settings: (
       <SettingsPage
         isDemo={isDemo}
@@ -693,6 +731,7 @@ function AppShell({
 
 function Dashboard({ onNavigate, workspace }: { onNavigate: (route: RouteId) => void; workspace: WorkspaceData }) {
   const timeline = useTimeline(workspace.photos, workspace.messages)
+  const todayMemory = useMemo(() => getTodayMemory(workspace.photos), [workspace.photos])
   const pinned = workspace.messages.find((message) => message.is_pinned)
   const nextAnniversary = [...workspace.anniversaries].sort(
     (a, b) => daysUntilAnnualDate(a.date) - daysUntilAnnualDate(b.date),
@@ -744,6 +783,14 @@ function Dashboard({ onNavigate, workspace }: { onNavigate: (route: RouteId) => 
             <strong>{daysBetween(workspace.couple.start_date)}</strong>
             <span>天</span>
           </div>
+          {todayMemory ? (
+            <button className="rail-card today-memory" type="button" onClick={() => onNavigate('photos')}>
+              {todayMemory.signedUrl ? <img alt={todayMemory.caption} src={todayMemory.signedUrl} /> : null}
+              <small>{isSameMonthDay(todayMemory.taken_at, toDateInputValue()) ? '今天的回忆' : '最近的旧胶片'}</small>
+              <h3>{todayMemory.caption}</h3>
+              <p>{formatFullDate(todayMemory.taken_at)}</p>
+            </button>
+          ) : null}
           {nextAnniversary ? (
             <div className="rail-card">
               <div className="rail-icon">
@@ -777,18 +824,49 @@ function Dashboard({ onNavigate, workspace }: { onNavigate: (route: RouteId) => 
 
 function PhotoWall({
   onDelete,
+  onUpdate,
   onUpload,
   photos,
 }: {
   onDelete: (photo: Photo) => Promise<void>
+  onUpdate: (photo: Photo, input: { caption: string; takenAt: string; tags: string[] }) => Promise<Photo>
   onUpload: (input: { file: File; caption: string; takenAt: string; tags: string[] }) => Promise<void>
   photos: Photo[]
 }) {
   const [activeTag, setActiveTag] = useState('全部')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [photoLayouts, setPhotoLayouts] = useState<Record<string, PolaroidLayout>>({})
+  const [searchQuery, setSearchQuery] = useState('')
   const [viewerPhoto, setViewerPhoto] = useState<Photo | null>(null)
   const tags = useMemo(() => ['全部', ...Array.from(new Set(photos.flatMap((photo) => photo.tags)))], [photos])
-  const filtered = activeTag === '全部' ? photos : photos.filter((photo) => photo.tags.includes(activeTag))
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    return photos.filter((photo) => {
+      const matchesTag = activeTag === '全部' || photo.tags.includes(activeTag)
+      const matchesDateFrom = !dateFrom || photo.taken_at >= dateFrom
+      const matchesDateTo = !dateTo || photo.taken_at <= dateTo
+      const searchable = [photo.caption, photo.taken_at, formatFullDate(photo.taken_at), ...photo.tags].join(' ').toLowerCase()
+      const matchesQuery = !query || searchable.includes(query)
+
+      return matchesTag && matchesDateFrom && matchesDateTo && matchesQuery
+    })
+  }, [activeTag, dateFrom, dateTo, photos, searchQuery])
+  const hasFilters = activeTag !== '全部' || searchQuery.trim() !== '' || dateFrom !== '' || dateTo !== ''
+
+  const clearFilters = () => {
+    setActiveTag('全部')
+    setSearchQuery('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  const updateSelectedPhoto = async (photo: Photo, input: { caption: string; takenAt: string; tags: string[] }) => {
+    const updated = await onUpdate(photo, input)
+    setViewerPhoto(updated)
+    return updated
+  }
 
   const updatePhotoLayout = (photo: Photo, index: number, event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
@@ -809,6 +887,31 @@ function PhotoWall({
     <main className="page-grid">
       <section>
         <SectionTitle icon={Camera} title="照片墙" subtitle="拍立得一样贴上去，日期和标签会帮你们慢慢整理" />
+        <div className="photo-search-panel" aria-label="照片搜索">
+          <label>
+            搜索
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="搜文案、标签或日期"
+              type="search"
+            />
+          </label>
+          <label>
+            从
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </label>
+          <label>
+            到
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </label>
+          <div className="filter-summary">
+            <span>{filtered.length} / {photos.length} 张</span>
+            <button disabled={!hasFilters} type="button" onClick={clearFilters}>
+              清空筛选
+            </button>
+          </div>
+        </div>
         <div className="tag-filter" aria-label="照片标签筛选">
           {tags.map((tag) => (
             <button className={activeTag === tag ? 'active' : ''} key={tag} onClick={() => setActiveTag(tag)} type="button">
@@ -816,50 +919,88 @@ function PhotoWall({
             </button>
           ))}
         </div>
-        <div className="photo-masonry">
-          {filtered.map((photo, index) => {
-            const layout = photoLayouts[photo.id] ?? buildFallbackPolaroidLayout(index)
-            const polaroidStyle: PolaroidStyle = {
-              '--photo-ratio': String(layout.ratio),
-              '--polaroid-bottom': `${layout.bottom}px`,
-              '--polaroid-pad': `${layout.pad}px`,
-              '--polaroid-tilt': `${layout.tilt}deg`,
-              '--polaroid-tone': layout.tone,
-            }
+        {filtered.length > 0 ? (
+          <div className="photo-masonry">
+            {filtered.map((photo, index) => {
+              const layout = photoLayouts[photo.id] ?? buildFallbackPolaroidLayout(index)
+              const polaroidStyle: PolaroidStyle = {
+                '--photo-ratio': String(layout.ratio),
+                '--polaroid-bottom': `${layout.bottom}px`,
+                '--polaroid-pad': `${layout.pad}px`,
+                '--polaroid-tilt': `${layout.tilt}deg`,
+                '--polaroid-tone': layout.tone,
+              }
 
-            return (
-              <article className={`polaroid-card ${layout.kind}`} key={photo.id} style={polaroidStyle}>
-                {photo.signedUrl ? (
-                  <button className="photo-open-button" type="button" onClick={() => setViewerPhoto(photo)} aria-label={`查看照片：${photo.caption}`}>
-                    <img alt={photo.caption} src={photo.signedUrl} onLoad={(event) => updatePhotoLayout(photo, index, event)} />
-                  </button>
-                ) : (
-                  <div className="image-missing">照片链接过期</div>
-                )}
-                <div className="polaroid-caption">
-                  <p>{photo.caption}</p>
-                  <time>{formatFullDate(photo.taken_at)}</time>
-                  <div>
-                    {photo.tags.map((tag) => (
-                      <span key={tag}>#{tag}</span>
-                    ))}
+              return (
+                <article className={`polaroid-card ${layout.kind}`} key={photo.id} style={polaroidStyle}>
+                  {photo.signedUrl ? (
+                    <button
+                      className="photo-open-button"
+                      type="button"
+                      onClick={() => setViewerPhoto(photo)}
+                      aria-label={`查看照片：${photo.caption}`}
+                    >
+                      <img alt={photo.caption} src={photo.signedUrl} onLoad={(event) => updatePhotoLayout(photo, index, event)} />
+                    </button>
+                  ) : (
+                    <div className="image-missing">照片链接过期</div>
+                  )}
+                  <div className="polaroid-caption">
+                    <p>{photo.caption}</p>
+                    <time>{formatFullDate(photo.taken_at)}</time>
+                    <div>
+                      {photo.tags.map((tag) => (
+                        <span key={tag}>#{tag}</span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <button className="icon-button danger" title="删除照片" type="button" onClick={() => void onDelete(photo)}>
-                  <Trash2 size={17} />
-                </button>
-              </article>
-            )
-          })}
-        </div>
+                  <button className="icon-button danger" title="删除照片" type="button" onClick={() => void onDelete(photo)}>
+                    <Trash2 size={17} />
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <Camera size={24} />
+            <p>这卷胶片里暂时没有匹配的照片。</p>
+            <button type="button" onClick={clearFilters}>清空筛选</button>
+          </div>
+        )}
       </section>
       <PhotoUploadForm onUpload={onUpload} />
-      {viewerPhoto ? createPortal(<PhotoViewer photo={viewerPhoto} onClose={() => setViewerPhoto(null)} />, document.body) : null}
+      {viewerPhoto
+        ? createPortal(
+            <PhotoViewer
+              photo={viewerPhoto}
+              onClose={() => setViewerPhoto(null)}
+              onDelete={async (photo) => {
+                await onDelete(photo)
+                setViewerPhoto(null)
+              }}
+              onUpdate={updateSelectedPhoto}
+            />,
+            document.body,
+          )
+        : null}
     </main>
   )
 }
 
-function PhotoViewer({ onClose, photo }: { onClose: () => void; photo: Photo }) {
+function PhotoViewer({
+  onClose,
+  onDelete,
+  onUpdate,
+  photo,
+}: {
+  onClose: () => void
+  onDelete: (photo: Photo) => Promise<void>
+  onUpdate: (photo: Photo, input: { caption: string; takenAt: string; tags: string[] }) => Promise<Photo>
+  photo: Photo
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
   const gestureRef = useRef<{
     distance: number
@@ -894,6 +1035,15 @@ function PhotoViewer({ onClose, photo }: { onClose: () => void; photo: Photo }) 
   const resetZoom = () => {
     gestureRef.current = { distance: 0, pointers: new Map(), scale: 1, x: 0, y: 0 }
     setTransform({ scale: 1, x: 0, y: 0 })
+  }
+
+  const deleteCurrentPhoto = async () => {
+    setIsDeleting(true)
+    try {
+      await onDelete(photo)
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const updatePointer = (event: PointerEvent<HTMLDivElement>) => {
@@ -977,10 +1127,92 @@ function PhotoViewer({ onClose, photo }: { onClose: () => void; photo: Photo }) 
         ) : null}
       </div>
       <div className="photo-viewer-caption">
-        <p>{photo.caption}</p>
-        <time>{formatFullDate(photo.taken_at)}</time>
+        {isEditing ? (
+          <PhotoEditForm
+            photo={photo}
+            onCancel={() => setIsEditing(false)}
+            onSave={async (input) => {
+              await onUpdate(photo, input)
+              setIsEditing(false)
+            }}
+          />
+        ) : (
+          <>
+            <p>{photo.caption}</p>
+            <time>{formatFullDate(photo.taken_at)}</time>
+            <div className="viewer-tags">
+              {photo.tags.length > 0 ? photo.tags.map((tag) => <span key={tag}>#{tag}</span>) : <span>还没有标签</span>}
+            </div>
+            <div className="viewer-actions">
+              <button type="button" onClick={() => setIsEditing(true)}>
+                <Sparkles size={17} />
+                编辑信息
+              </button>
+              <button className="text-danger" disabled={isDeleting} type="button" onClick={() => void deleteCurrentPhoto()}>
+                {isDeleting ? <Loader2 className="spin" size={17} /> : <Trash2 size={17} />}
+                删除照片
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
+  )
+}
+
+function PhotoEditForm({
+  onCancel,
+  onSave,
+  photo,
+}: {
+  onCancel: () => void
+  onSave: (input: { caption: string; takenAt: string; tags: string[] }) => Promise<void>
+  photo: Photo
+}) {
+  const [caption, setCaption] = useState(photo.caption)
+  const [isSaving, setIsSaving] = useState(false)
+  const [tags, setTags] = useState(photo.tags.join(', '))
+  const [takenAt, setTakenAt] = useState(photo.taken_at)
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsSaving(true)
+    try {
+      await onSave({
+        caption,
+        tags: tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        takenAt,
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <form className="photo-edit-form" onSubmit={submit}>
+      <label>
+        一句话
+        <textarea required value={caption} onChange={(event) => setCaption(event.target.value)} />
+      </label>
+      <label>
+        拍摄日期
+        <input required type="date" value={takenAt} onChange={(event) => setTakenAt(event.target.value)} />
+      </label>
+      <label>
+        标签
+        <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="咖啡, 周末, 上海" />
+      </label>
+      <div className="viewer-actions">
+        <button disabled={isSaving} type="submit">
+          {isSaving ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+          保存信息
+        </button>
+        <button type="button" onClick={onCancel}>取消</button>
+      </div>
+    </form>
   )
 }
 
@@ -1436,6 +1668,19 @@ function clamp(value: number, min: number, max: number) {
 
 function distanceBetween(first: { x: number; y: number }, second: { x: number; y: number }) {
   return Math.hypot(first.x - second.x, first.y - second.y)
+}
+
+function getTodayMemory(photos: Photo[]) {
+  if (photos.length === 0) {
+    return null
+  }
+
+  const today = toDateInputValue()
+  return photos.find((photo) => isSameMonthDay(photo.taken_at, today)) ?? photos[0]
+}
+
+function isSameMonthDay(first: string, second: string) {
+  return first.slice(5, 10) === second.slice(5, 10)
 }
 
 function buildFallbackPolaroidLayout(index: number): PolaroidLayout {
