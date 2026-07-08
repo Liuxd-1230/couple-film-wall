@@ -39,6 +39,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme="lavender"] {
+  --paper: #f1eaf6;
+  --paper-deep: #dfd1eb;
+  --surface: #fff9f7;
+  --surface-strong: #f6edf8;
+  --ink: #2d2436;
+  --muted: #746681;
+  --line: #d6c0df;
+  --rose: #bf8cad;
+  --rose-deep: #7b527f;
+  --sage: #76709a;
+  --sage-soft: #e4e0ef;
+  --amber: #c8a176;
+  --blue: #756f9f;
+  --blue-soft: #e4e1f2;
+  --blush-soft: #f2dce8;
+  --shadow: 0 24px 52px rgba(79, 58, 94, 0.15);
+  --soft-shadow: 0 12px 26px rgba(79, 58, 94, 0.1);
+  --hairline: rgba(112, 86, 127, 0.18);
+
+  background:
+    linear-gradient(115deg, rgba(191, 140, 173, 0.14), transparent 32%),
+    linear-gradient(245deg, rgba(117, 111, 159, 0.14), transparent 40%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.2) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, rgba(255, 249, 247, 0.86), rgba(223, 209, 235, 0.7)),
+    var(--paper);
+}
+
 * {
   box-sizing: border-box;
 }

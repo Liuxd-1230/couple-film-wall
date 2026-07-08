@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   MessageCircleHeart,
+  Palette,
   Pin,
   RotateCcw,
   Settings,
@@ -45,8 +46,10 @@ import { isSupabaseConfigured } from './lib/supabase'
 import type { Anniversary, Message, Photo, RouteId, TimelineItem, WorkspaceData } from './types'
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
+type ThemeMode = 'classic' | 'lavender'
 const otpMinLength = 6
 const otpMaxLength = 8
+const themeStorageKey = 'couple-film-theme'
 type PhotoShape = 'landscape' | 'portrait' | 'square'
 type PolaroidLayout = {
   bottom: number
@@ -74,6 +77,7 @@ const routes: Array<{ id: RouteId; label: string; icon: typeof Home }> = [
 
 function App() {
   const [route, setRoute] = useHashRoute()
+  const [themeMode, toggleThemeMode] = useThemeMode()
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(isSupabaseConfigured ? null : demoWorkspace)
   const [isDemo, setIsDemo] = useState(!isSupabaseConfigured)
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured)
@@ -349,7 +353,9 @@ function App() {
       notice={notice}
       onDismissNotice={() => setNotice(null)}
       onNavigate={setRoute}
+      onToggleTheme={toggleThemeMode}
       route={route}
+      themeMode={themeMode}
       workspace={workspace}
     />
   )
@@ -374,6 +380,24 @@ function useHashRoute(): [RouteId, (next: RouteId) => void] {
   }
 
   return [route, navigate]
+}
+
+function useThemeMode(): [ThemeMode, () => void] {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const saved = window.localStorage.getItem(themeStorageKey)
+    return saved === 'classic' || saved === 'lavender' ? saved : 'lavender'
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode
+    window.localStorage.setItem(themeStorageKey, themeMode)
+  }, [themeMode])
+
+  const toggleThemeMode = () => {
+    setThemeMode((current) => (current === 'lavender' ? 'classic' : 'lavender'))
+  }
+
+  return [themeMode, toggleThemeMode]
 }
 
 function LoadingScreen() {
@@ -564,7 +588,9 @@ function AppShell({
   notice,
   onDismissNotice,
   onNavigate,
+  onToggleTheme,
   route,
+  themeMode,
   workspace,
 }: {
   actions: {
@@ -583,7 +609,9 @@ function AppShell({
   notice: Notice
   onDismissNotice: () => void
   onNavigate: (route: RouteId) => void
+  onToggleTheme: () => void
   route: RouteId
+  themeMode: ThemeMode
   workspace: WorkspaceData
 }) {
   const content = {
@@ -627,23 +655,35 @@ function AppShell({
             <small>胶片复古纪念册</small>
           </span>
         </button>
-        <nav aria-label="主导航">
-          {routes.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                aria-current={route === item.id ? 'page' : undefined}
-                className="nav-button"
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                type="button"
-              >
-                <Icon size={17} />
-                {item.label}
-              </button>
-            )
-          })}
-        </nav>
+        <div className="topbar-actions">
+          <nav aria-label="主导航">
+            {routes.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  aria-current={route === item.id ? 'page' : undefined}
+                  className="nav-button"
+                  key={item.id}
+                  onClick={() => onNavigate(item.id)}
+                  type="button"
+                >
+                  <Icon size={17} />
+                  {item.label}
+                </button>
+              )
+            })}
+          </nav>
+          <button
+            aria-label={themeMode === 'lavender' ? '切换到经典胶片主题' : '切换到淡紫胶片主题'}
+            className="theme-button"
+            onClick={onToggleTheme}
+            title={themeMode === 'lavender' ? '切换到经典胶片主题' : '切换到淡紫胶片主题'}
+            type="button"
+          >
+            <Palette size={17} />
+            {themeMode === 'lavender' ? '淡紫' : '经典'}
+          </button>
+        </div>
       </header>
       <NoticeBar notice={notice} onDismiss={onDismissNotice} />
       {content[route]}
